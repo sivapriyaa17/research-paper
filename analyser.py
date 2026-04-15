@@ -1,57 +1,38 @@
+# analyser.py ✅ Updated for Groq API (Free & Fast)
+import os
 import re
-from transformers import pipeline
+from dotenv import load_dotenv
+from groq import Groq
 
-# Small model (faster and less memory)
-model_name = "sshleifer/distilbart-cnn-12-6"
+# Load your API key from .env
+load_dotenv()
 
-summarizer = pipeline(
-    "summarization",
-    model=model_name
-)
+# Initialize Groq Client
+# Ensure you have GROQ_API_KEY in your .env file
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-
-# --------------------
-# CLEAN TEXT
-# --------------------
 def clean_text(text):
-
     text = text.replace("\n", " ")
     text = re.sub(r"\s+", " ", text)
     text = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
+    return text.strip()
 
-    return text
-
-
-# --------------------
-# ANALYZE PAPER
-# --------------------
 def analyze_paper(text):
-
-    text = clean_text(text)
-
-    # limit input
-    text = text[:3500]
-
-    prompt = f"""
-Convert this research paper into easy student notes.
-
-Include:
-1. Problem Statement
-2. Methodology
-3. Key Components
-4. Advantages
-5. Results
-6. Conclusion
-
-Paper:
-{text}
-"""
-
-    result = summarizer(
-        prompt,
-        max_length=400,
-        min_length=120,
-        do_sample=False
-    )
-
-    return result[0]["summary_text"]
+    # Clean and limit text to fit API context window
+    text = clean_text(text)[:6000]
+    
+    # Import prompt from your prompts.py
+    from prompts import create_prompt
+    prompt = create_prompt(text)
+    
+    try:
+        # Call Groq's LLM API
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",  # Fast, free model on Groq
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=1024
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"⚠️ Error: {str(e)}\n\nTip: Check your GROQ_API_KEY in .env"
